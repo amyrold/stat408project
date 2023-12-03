@@ -1,26 +1,81 @@
 ---
-title: "Final_Project"
-author: "Rolando Santos"
+title: "STAT 408 Final Project"
+author: "Aaron Myrold, Sathvik Maridasana Nagaraj, Rolando Santos"
 date: "2023-11-26"
-output: html_document
+output: 
+  html_document:
+    toc: yes
+    theme: default
+  pdf_document: default
+urlcolor: cyan
 ---
 
-```{r}
+# Bike Sharing Predictive Model
+
+## Introduction
+TBD
+
+### Source
+Our data was found from https://archive.ics.uci.edu/dataset/275/bike+sharing+dataset. This data provides 2 files for data, we will be using the 'day.csv' since every entry is an individual day compared to every hour in the 'hour.csv'.
+
+### Variables
+The dataset has 16 unique variables, however, this study will start off with using 12 of them.
+
+#### Used
+- **season**: Season
+  + `1`: Winter
+  + `2`: Spring
+  + `3`: Summer
+  + `4`: Fall
+- **year**: Year
+  + `0`: 2011
+  + `1`: 2012
+- **mnth**: Month (`1`: January - `12`: December)
+- **holiday**: Whether day is holiday or not (`0`: No, `1`: Yes)
+- **weekday**: Day of the Week (`0`: Sunday - `6`: Saturday)
+- **workingday**: If day is neither weekend nor holiday (`0`: No, `1`: Yes)
+- **weathersit**: Weather Situation
+  + `1`: Clear
+  + `2`: Misty
+  + `3`: Snow/Rain
+- **temp**: Normalized Temperature in Celsius
+- **atemp**: Normalized Feeling Temperature in Celcius
+- **windspeed**: Normalized Wind Speed
+- **cnt**: Count of total rental bikes including both casual and registered (Response)
+
+#### Unused
+- **instant**: Record Index
+- **dteday**: Date
+- **casual**: Count of Casual Users
+- **registered**: Count of Registered Users
+
+The reason why `casual` and `registered` are not used is because they are too closely related to the response `cnt` due to `cnt` being the sum of both variables and can cause issues with our model due to the extremely high correlation.
+
+Each group member will try to fit several models with the price as the response, and a combination of the remaining variables as predictors. The best model fit by each member will be listed below, and will be discussed in the `Results` and `Discussion` sections that follow.
+
+## Methods
+
+```{r echo = FALSE, message = FALSE, warning = FALSE}
+# Libraries Used
 library(tidyverse)
 library(dplyr)
 library(forcats)
 library(ggplot2)
 library(gridExtra)
 library(cowplot)
+library(carData)
+library(corrgram)
 ```
 
 ```{r}
+# Set seed to ensure you always have same random numbers generated
+set.seed(408)  
+```
+
+```{r}
+# Importing the data
 bike_sharing <- read.csv("day.csv")
 head(bike_sharing)
-```
-
-```{r}
-dim(bike_sharing)
 ```
 
 ```{r}
@@ -29,14 +84,55 @@ na_count <- data.frame(na_count)
 na_count
 ```
 
-There are no NAs in the the dataset.
-
-### Data Cleaning
+There are no missing values in the the dataset.
 
 ```{r}
 bike_sharing <- bike_sharing[ ,!names(bike_sharing) %in% c("instant", "registered", "dteday", "casual")]
 head(bike_sharing)
 ```
+
+Removed the `instant`, `registered`, `dteday` and `casual` columns from our dataset.
+
+### Helper Functions
+
+```{r}
+# Plots "Fitted vs Residual" and "Q-Q" Plots 
+plot_diagnostics = function(model) {
+  par(mfrow = c(1, 2))
+  plot(fitted(model), resid(model), 
+       col = "grey", pch = 20, 
+       xlab = "Fitted", ylab = "Residuals", 
+       main = "Data from Additive Model")
+  abline(h = 0, col = "darkorange", lwd = 2)
+  qqnorm(resid(model), main = "Normal Q-Q Plot", col = "darkgrey")
+  qqline(resid(model), col = "dodgerblue", lwd = 2)
+}
+
+# Create bar plots for categorical vs numeric relationships
+create_bp <- function(var){
+  bike_sharing %>%
+    ggplot(
+      aes_string(x = toString(var), y = "cnt", fill = "year")
+    ) + geom_col(
+      position = position_dodge()
+    )
+}
+
+# Calculates RMSE given "actual" and "predicted values"
+get_train_rmse = function(model) {
+  predicted = (predict(model, bike_sharing_trn))
+  sqrt(mean((predicted - bike_sharing_trn$cnt)^2))
+}
+
+get_test_rmse = function(model) {
+  predicted = (predict(model, bike_sharing_tst))
+  sqrt(mean((predicted - bike_sharing_tst$cnt)^2))
+}
+```
+
+### Investigation and Variable Relationships
+
+First we will map our categorical variables to their respective descriptions for clarity.
 
 ```{r}
 bike_sharing <- bike_sharing %>% 
@@ -99,26 +195,11 @@ bike_sharing <- bike_sharing %>% mutate(
     "Snow/Rain" = "3"
   )
 )
-head(bike_sharing)
 ```
 
-```{r}
-model <- lm(cnt ~ ., data = bike_sharing)
-summary(model)
-```
+Some plots showing the relationship between the categorical variables and `cnt`.
 
 ```{r}
-create_bp <- function(var){
-  bike_sharing %>%
-    ggplot(
-      aes_string(x = toString(var), y = "cnt", fill = "year")
-    ) + geom_col(
-      position = position_dodge()
-    )
-}
-
-
-
 plot_grid(
   create_bp("season"), 
   create_bp("weathersit"),
@@ -127,3 +208,78 @@ plot_grid(
   labels=c("A", "B"),
   ncol = 2, nrow = 2)
 ```
+
+Some plots showing the relationship between the numeric variables and `cnt`.
+
+```{r}
+#TODO
+```
+
+We will also fit a base model to view the current significance of coefficients and to view any constant variance or normality issues.
+
+```{r}
+model <- lm(cnt ~ ., data = bike_sharing)
+summary(model)
+```
+One glaring issue with our current base model is that we have a collinearity issue related to `workingday`. Reviewing our variable definitions, `workingday` is directly correlated to whether or not a the current day is neither a weekend or holiday. Thus it would be best to also remove this variable from our model going forward.
+
+```{r}
+plot_diagnostics(model)
+```
+
+We can see that our data does seem to uphold constant variance, however there appears to be some tail skewedness on our Q-Q plot. Our updated models may resolve this issue.
+
+### Predictive Model Preparation
+
+Since one of the goals of our project is the predict the number of bikes needed for a given day based on provided conditions, it would be best to adjust the categorical variables by turning them into dummy variables/one-hot encoding them.
+
+```{r}
+# Creating Dummy Variables
+bike_sharing <- fastDummies::dummy_cols(bike_sharing, remove_first_dummy = TRUE)
+
+# Removing the original columns
+bike_sharing <- bike_sharing[ ,!names(bike_sharing) %in% c("season", "year", "month", "holiday", "weekday", "workingday", "weathersit")]
+head(bike_sharing)
+```
+
+
+We then split the resulting dataset into training and testing datasets, using an 80:20 split.
+
+```{r}
+sample_size = floor(0.8 * nrow(bike_sharing)) 
+indices = sample(seq_len(nrow(bike_sharing)), size = sample_size)
+bike_sharing_trn = bike_sharing[indices,]
+bike_sharing_tst = bike_sharing[-indices,]
+```
+
+### Models
+
+TBD
+
+## Results
+
+TBD
+
+### Plot Diagnostics
+
+TBD
+
+### MSE & $R^2$ Testing
+
+TBD
+
+## Discussion
+
+TBD
+
+### Plot Diagnostics
+
+TBD
+
+### MSE & $R^2$ Testing
+
+TBD
+
+## Conclusion
+
+TBD
