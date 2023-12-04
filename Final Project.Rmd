@@ -219,6 +219,7 @@ Some plots showing the relationship between the numeric variables and `cnt`.
 ```{r}
 #TODO
 # fake to do ...
+# one
 ```
 
 We will also fit a base model to view the current significance of coefficients and to view any constant variance or normality issues.
