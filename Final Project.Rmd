@@ -218,9 +218,7 @@ Some plots showing the relationship between the numeric variables and `cnt`.
 
 ```{r}
 #TODO
-# fake to do ...
-# one
-# two
+
 ```
 
 We will also fit a base model to view the current significance of coefficients and to view any constant variance or normality issues.
@@ -290,6 +288,55 @@ model1 <- lm(formula = cnt ~ temp + hum + windspeed + season_Summer + season_Fal
 summary(model1)
 ```
 
+#### Model 2: Transformation
+```{r}
+#sathvik Model_2
+bike_sharing_trn_transformed <- bike_sharing_trn
+ 
+# transformation
+bike_sharing_trn_transformed$log_temp <- log(bike_sharing_trn_transformed$temp)
+# Added small constant to hum to avoid taking the logarithm of zero
+bike_sharing_trn_transformed$log_hum <- log(bike_sharing_trn_transformed$hum)
+bike_sharing_trn_transformed$log_windspeed <- log(bike_sharing_trn_transformed$windspeed)
+ 
+names(bike_sharing_trn_transformed)
+```
+
+```{r}
+# model
+model_2 <- lm(formula = cnt ~ log_temp + log(1 + hum) + log_windspeed + season_Summer + season_Fall + season_Winter + year_2012 + month_February + month_March + month_April + month_May + month_June + month_July + month_August + month_September + month_October + month_November + month_December + holiday_Yes + weekday_Monday + weekday_Tuesday + weekday_Wednesday + weekday_Thursday + weekday_Friday + weekday_Saturday + workingday_Yes + weathersit_Misty + `weathersit_Snow/Rain`, data = bike_sharing_trn_transformed)
+```
+
+#### Model 3: Correlation Matrix
+```{r}
+# Compute correlation matrix
+  correlation_matrix <- cor(bike_sharing_trn)
+ 
+# Identifying pairs of variables with high correlation coefficients
+highly_correlated_pairs <- which(correlation_matrix > 0.8 & correlation_matrix < 1, arr.ind = TRUE)
+print(highly_correlated_pairs)
+ 
+bike_sharing_trn_corr <- bike_sharing_trn
+bike_sharing_trn_corr <- subset(bike_sharing_trn_corr, select = -c(atemp)) # excluded "atemp"
+ 
+ 
+#model without atemp
+model_3 <- lm(cnt ~ . -workingday_Yes, data = bike_sharing_trn_corr)
+summary(model_3)
+```
+
+
+#### Model 4: QQ-Norm
+```{r}
+
+```
+
+#### Model 5: ANOVA
+```{r}
+
+```
+
+
 ## Results
 
 ### Plot Diagnostics
@@ -298,6 +345,25 @@ summary(model1)
 
 ```{r}
 plot_diagnostics(model1)
+```
+
+#### Model 2: Transformation
+
+```{r}
+plot_diagnostics(model2)
+```
+
+#### Model 3: Correlation Matrix
+
+```{r}
+plot_diagnostics(model3)
+
+vif_values_model_3 <- car::vif(model_3)
+vif_values_model_3
+ 
+ 
+#There are some variables with high VIP.
+#Trying transformation here too to see if it reduces the VIF
 ```
 
 
@@ -311,6 +377,8 @@ rsme_table = data.frame(c("Base Model", "AIC model"), sapply(mod_list, get_train
 
 kable(rsme_table, format = "markdown", col.names = c("Model", "Training RMSE", "Testing RMSE", "Adjusted R-Squared"))
 ```
+
+
 
 
 ## Discussion
