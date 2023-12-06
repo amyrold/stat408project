@@ -79,6 +79,7 @@ library(gridExtra)
 library(cowplot)
 library(carData)
 library(corrgram)
+library(faraway)
 ```
 
 ```{r}
@@ -150,6 +151,11 @@ get_nrmse <- function(model, data){
 # Get model adjusted r-squared
 get_r_squared <- function(model) {
    return(summary(model)$adj.r.squared)
+}
+
+# Get max vif
+get_max_vif <- function(model) {
+  return(max(vif(model)))
 }
 ```
 
@@ -282,6 +288,7 @@ bike_sharing_trn = bike_sharing[indices,]
 bike_sharing_tst = bike_sharing[-indices,]
 
 adj_r_squared <- c()
+max_vif <- c()
 ```
 
 ### Models
@@ -291,7 +298,7 @@ adj_r_squared <- c()
 This is the initial model similar to the one show above that to used a base comparison for the other models.
 
 ```{r}
-model0 <- lm(cnt ~ ., data = bike_sharing_trn)
+model0 <- lm(cnt ~ .-workingday_Yes, data = bike_sharing_trn)
 ```
 
 
@@ -334,7 +341,7 @@ names(bike_sharing_trn_transformed)
 ```
 
 ```{r}
-model2 <- lm(formula = cnt ~ log_temp + log(1 + hum) + log_windspeed + season_Summer + season_Fall + season_Winter + year_2012 + month_February + month_March + month_April + month_May + month_June + month_July + month_August + month_September + month_October + month_November + month_December + holiday_Yes + weekday_Monday + weekday_Tuesday + weekday_Wednesday + weekday_Thursday + weekday_Friday + weekday_Saturday + workingday_Yes + weathersit_Misty + `weathersit_Snow/Rain`, data = bike_sharing_trn_transformed)
+model2 <- lm(formula = cnt ~ log_temp + log(1 + hum) + log_windspeed + season_Summer + season_Fall + season_Winter + year_2012 + month_February + month_March + month_April + month_May + month_June + month_July + month_August + month_September + month_October + month_November + month_December + holiday_Yes + weekday_Monday + weekday_Tuesday + weekday_Wednesday + weekday_Thursday + weekday_Friday + weekday_Saturday + weathersit_Misty + `weathersit_Snow/Rain`, data = bike_sharing_trn_transformed)
 ```
 
 #### Model 3: Correlation Matrix
@@ -390,6 +397,13 @@ NRMSE.test
 
 ### Plot Diagnostics
 
+#### Base Model
+
+```{r}
+plot_diagnostics(model0)
+```
+
+
 #### Model 1: AIC
 
 ```{r}
@@ -419,7 +433,7 @@ vif_values_model_3
 plot_diagnostics(model4)
 ```
 
-### MSE & $R^2$ Testing
+### NMSE Comparison
 
 ```{r}
 library(knitr)
@@ -438,22 +452,34 @@ tst_nrmse = c(
   get_nrmse(model3, bike_sharing_tst_corr)
 )
 
-rsme_table = data.frame(
-  c("Base Model", "AIC Model", "Transformation Model", "Correlation Model"), trn_nrmse, tst_nrmse, sapply(mod_list, get_r_squared))
+nrsme_table = data.frame(
+  c("Base Model", "AIC Model", "Transformation Model", "Correlation Model"), trn_nrmse, tst_nrmse)
 
-kable(rsme_table, format = "markdown", col.names = c("Model", "Training NRMSE", "Testing NRMSE", "Adjusted R-Squared"))
+kable(nrsme_table, format = "markdown", col.names = c("Model", "Training NRMSE", "Testing NRMSE"))
 ```
 
+### R-Squared and VIF Test
 
+```{r}
+rvif_table = data.frame(
+  c("Base Model", "AIC Model", "Transformation Model", "Correlation Model"), sapply(mod_list, get_r_squared), sapply(mod_list, get_max_vif))
 
+kable(rvif_table, format = "markdown", col.names = c("Model", "Adjusted R-Squared", "Max VIF"))
+```
 
 ## Discussion
 
 ### Plot Diagnostics
 
+Although this study intended to fit a good predictive model, the group members decided that all models must hold for all LINE assumptions, for them to be considered. Looking at the plot diagnostics, we notice the following:
+
+`Model 1`'s Q-Q Plot had an evident tail on the left hand side, which resulted in a violation of the normality assumption. There is not much difference between this plot and the base model's plot
+
+### NRMSE Comparison
+
 TBD
 
-### MSE & $R^2$ Testing
+### R-Squared and VIF Test
 
 TBD
 
