@@ -361,28 +361,28 @@ summary(model3)
 ```{r}
 library(caret)
 # random split the data into 80% training and 20% test
-index.train <- sample(1:dim(bike_sharing_trn)[1], 0.8 * dim(bike_sharing_trn)[1])
-data.train <- bike_sharing_trn[index.train,]
-data.test <- bike_sharing_trn[-index.train,]
+index.dev <- sample(1:dim(bike_sharing_trn)[1], 0.8 * dim(bike_sharing_trn)[1])
+dev.train <- bike_sharing_trn[index.train,]
+ddev.test <- bike_sharing_trn[-index.train,]
 
 # knn model
 knnmodel <- knnreg(data.train, data.train$cnt, k=5)
 
-# predict on the test set
+# predict on the dev set
 yhat.test = predict(knnmodel, data.test)
 
-# calculate test MSE
+# calculate dev Scores
 y.test <- data.test$cnt
 MSE.test <- mean((y.test - yhat.test)^2)
 MSE.test
 
-# root MSE
 RMSE.test <- sqrt(MSE.test)
 RMSE.test
 
-# normalized root MSE
 NRMSE.test <- RMSE.test / mean(y.test)
 NRMSE.test
+
+
 ```
 
 
