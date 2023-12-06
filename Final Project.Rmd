@@ -97,7 +97,7 @@ Removed the `instant`, `registered`, `dteday` and `casual` columns from our data
 
 ```{r}
 # Plots "Fitted vs Residual" and "Q-Q" Plots 
-plot_diagnostics = function(model) {
+plot_diagnostics <- function(model) {
   par(mfrow = c(1, 2))
   plot(fitted(model), resid(model), 
        col = "grey", pch = 20, 
@@ -109,13 +109,21 @@ plot_diagnostics = function(model) {
 }
 
 # Create bar plots for categorical vs numeric relationships
-create_bp <- function(var){
+create_bp <- function(var, color = "year"){
   bike_sharing %>%
     ggplot(
-      aes_string(x = toString(var), y = "cnt", fill = "year")
+      aes_string(x = toString(var), y = "cnt", fill = color)
     ) + geom_col(
       position = position_dodge()
-    )
+    ) + coord_flip()
+}
+
+# Create scatter plots for numeric vs numeric relationships
+create_sp <- function(var, color = "year"){
+  bike_sharing %>%
+    ggplot(
+      aes_string(x = toString(var), y = "cnt", color = color)
+    ) + geom_point()
 }
 
 # Calculates RMSE given "actual" and "predicted values"
@@ -204,13 +212,19 @@ bike_sharing <- bike_sharing %>% mutate(
 
 Some plots showing the relationship between the categorical variables and `cnt`.
 
-```{r}
+```{r warning=FALSE}
 plot_grid(
   create_bp("season"), 
   create_bp("weathersit"),
-  create_bp("holiday"),
   create_bp("month"),
-  labels=c("A", "B"),
+  create_bp("weekday"),
+  ncol = 2, nrow = 2)
+
+plot_grid(
+  create_sp("temp"), 
+  create_sp("atemp"),
+  create_sp("hum"),
+  create_sp("windspeed"),
   ncol = 2, nrow = 2)
 ```
 
