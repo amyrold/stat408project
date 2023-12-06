@@ -1,0 +1,355 @@
+---
+title: "FP"
+author: "Sathvik Maridasana Nagaraj"
+date: "2023-12-05"
+output: html_document
+---
+
+### Variables
+
+The dataset has 16 unique variables, however, this study will start off with using 12 of them.
+
+#### Used
+
+-   **season**: Season
+    -   `1`: Winter
+    -   `2`: Spring
+    -   `3`: Summer
+    -   `4`: Fall
+-   **year**: Year
+    -   `0`: 2011
+    -   `1`: 2012
+-   **mnth**: Month (`1`: January - `12`: December)
+-   **holiday**: Whether day is holiday or not (`0`: No, `1`: Yes)
+-   **weekday**: Day of the Week (`0`: Sunday - `6`: Saturday)
+-   **workingday**: If day is neither weekend nor holiday (`0`: No, `1`: Yes)
+-   **weathersit**: Weather Situation
+    -   `1`: Clear
+    -   `2`: Misty
+    -   `3`: Snow/Rain
+-   **temp**: Normalized Temperature in Celsius
+-   **atemp**: Normalized Feeling Temperature in Celcius
+-   **windspeed**: Normalized Wind Speed
+-   **cnt**: Count of total rental bikes including both casual and registered (Response)
+
+#### Unused
+
+-   **instant**: Record Index
+-   **dteday**: Date
+-   **casual**: Count of Casual Users
+-   **registered**: Count of Registered Users
+
+The reason why `casual` and `registered` are not used is because they are too closely related to the response `cnt` due to `cnt` being the sum of both variables and can cause issues with our model due to the extremely high correlation.
+
+Each group member will try to fit several models with the price as the response, and a combination of the remaining variables as predictors. The best model fit by each member will be listed below, and will be discussed in the `Results` and `Discussion` sections that follow.
+
+## Methods
+
+```{r echo = FALSE, message = FALSE, warning = FALSE}
+# Libraries Used
+library(tidyverse)
+library(dplyr)
+library(forcats)
+library(ggplot2)
+library(gridExtra)
+library(cowplot)
+library(carData)
+library(corrgram)
+```
+
+```{r}
+# Set seed to ensure you always have same random numbers generated
+set.seed(408)  
+```
+
+```{r}
+
+# Importing the data
+bike_sharing <- read.csv("day.csv")
+head(bike_sharing)
+```
+
+```{r}
+na_count <-sapply(bike_sharing, function(y) sum(is.na(y))) 
+na_count <- data.frame(na_count)
+na_count
+```
+
+There are no missing values in the the dataset.
+
+```{r}
+bike_sharing <- bike_sharing[ ,!names(bike_sharing) %in% c("instant", "registered", "dteday", "casual")]
+head(bike_sharing)
+```
+
+Removed the `instant`, `registered`, `dteday` and `casual` columns from our dataset.
+
+### Helper Functions
+
+```{r}
+# Plots "Fitted vs Residual" and "Q-Q" Plots 
+plot_diagnostics = function(model) {
+  par(mfrow = c(1, 2))
+  plot(fitted(model), resid(model), 
+       col = "grey", pch = 20, 
+       xlab = "Fitted", ylab = "Residuals", 
+       main = "Data from Additive Model")
+  abline(h = 0, col = "darkorange", lwd = 2)
+  qqnorm(resid(model), main = "Normal Q-Q Plot", col = "darkgrey")
+  qqline(resid(model), col = "dodgerblue", lwd = 2)
+}
+
+# Create bar plots for categorical vs numeric relationships
+create_bp <- function(var){
+  bike_sharing %>%
+    ggplot(
+      aes_string(x = toString(var), y = "cnt", fill = "year")
+    ) + geom_col(
+      position = position_dodge()
+    )
+}
+
+# Calculates RMSE given "actual" and "predicted values"
+get_train_rmse = function(model) {
+  predicted = (predict(model, bike_sharing_trn))
+  return(sqrt(mean((predicted - bike_sharing_trn$cnt)^2)))
+}
+
+get_test_rmse <- function(model) {
+  predicted = (predict(model, bike_sharing_tst))
+  return(sqrt(mean((predicted - bike_sharing_tst$cnt)^2)))
+}
+```
+
+```{r}
+# Get model adjusted r-squared
+get_r_squared <- function(model) {
+   return(summary(model)$adj.r.squared)
+}
+```
+
+```{r}
+
+bike_sharing <- bike_sharing %>% 
+  rename(
+    year = yr,
+    month = mnth,
+  )
+bike_sharing <- bike_sharing %>% mutate(
+  holiday = fct_recode(as.factor(holiday),
+    "No" = "0",
+    "Yes" = "1",
+  )
+) %>% mutate(
+  season = fct_recode(as.factor(season),
+    "Spring" = "1",
+    "Summer" = "2",
+    "Fall" = "3",
+    "Winter" = "4"
+  )
+) %>% mutate(
+  year = fct_recode(as.factor(year),
+    "2011" = "0",
+    "2012" = "1"
+  )
+) %>% mutate(
+  month = fct_recode(as.factor(month),
+    "January" = "1",
+    "February" = "2",
+    "March" = "3",
+    "April" = "4",
+    "May" = "5",
+    "June" = "6",
+    "July" = "7",
+    "August" = "8",
+    "September" = "9",
+    "October" = "10",
+    "November" = "11",
+    "December" = "12"
+  )
+) %>% mutate(
+  weekday = fct_recode(as.factor(weekday),
+    "Sunday" = "0",
+    "Monday" = "1",
+    "Tuesday" = "2",
+    "Wednesday" = "3",
+    "Thursday" = "4",
+    "Friday" = "5",
+    "Saturday" = "6"
+  )
+) %>% mutate(
+  workingday = fct_recode(as.factor(workingday),
+    "No" = "0",
+    "Yes" = "1"
+  )
+) %>% mutate(
+  weathersit = fct_recode(as.factor(weathersit),
+    "Clear" = "1",
+    "Misty" = "2",
+    "Snow/Rain" = "3"
+  )
+)
+```
+
+Some plots showing the relationship between the categorical variables and `cnt`.
+
+```{r}
+plot_grid(
+  create_bp("season"), 
+  create_bp("weathersit"),
+  create_bp("holiday"),
+  create_bp("month"),
+  labels=c("A", "B"),
+  ncol = 2, nrow = 2)
+```
+
+We will also fit a base model to view the current significance of coefficients and to view any constant variance or normality issues.
+
+```{r}
+model <- lm(cnt ~ ., data = bike_sharing)
+summary(model)
+```
+
+One glaring issue with our current base model is that we have a collinearity issue related to `workingday`. Reviewing our variable definitions, `workingday` is directly correlated to whether or not a the current day is neither a weekend or holiday. Thus it would be best to also remove this variable from our model going forward.
+
+```{r}
+plot_diagnostics(model)
+```
+
+Some plots showing the relationship between the numeric variables and `cnt`.
+
+One glaring issue with our current base model is that we have a collinearity issue related to `workingday`. Reviewing our variable definitions, `workingday` is directly correlated to whether or not a the current day is neither a weekend or holiday. Thus it would be best to also remove this variable from our model going forward.
+
+```{r}
+plot_diagnostics(model)
+```
+
+```{r}
+library("fastDummies")
+# Creating Dummy Variables
+bike_sharing <- fastDummies::dummy_cols(bike_sharing, remove_first_dummy = TRUE)
+# Removing the original columns
+bike_sharing <- bike_sharing[ ,!names(bike_sharing) %in% c("season", "year", "month", "holiday", "weekday", "workingday", "weathersit")]
+head(bike_sharing)
+```
+
+```{r}
+sample_size = floor(0.8 * nrow(bike_sharing)) 
+indices = sample(seq_len(nrow(bike_sharing)), size = sample_size)
+bike_sharing_trn = bike_sharing[indices,]
+bike_sharing_tst = bike_sharing[-indices,]
+
+adj_r_squared <- c()
+```
+
+#### Base Model
+
+This is the initial model similar to the one show above that to used a base comparison for the other models.
+
+```{r}
+model0 <- lm(cnt ~ ., data = bike_sharing_trn)
+```
+
+#### Model 1: AIC
+
+```{r}
+model1 <- lm(cnt ~ . -workingday_Yes, data = bike_sharing_trn)
+step(model1)
+```
+
+```{r}
+model1 <- lm(formula = cnt ~ temp + hum + windspeed + season_Summer + season_Fall + 
+    season_Winter + year_2012 + month_March + month_April + month_May + 
+    month_June + month_July + month_September + month_October + 
+    holiday_Yes + weekday_Monday + weekday_Tuesday + weekday_Wednesday + 
+    weekday_Thursday + weekday_Friday + weekday_Saturday + weathersit_Misty + 
+    `weathersit_Snow/Rain`, data = bike_sharing_trn)
+summary(model1)
+```
+
+## Results
+
+### Plot Diagnostics
+
+TBD \#### Model 1: AIC
+
+```{r}
+plot_diagnostics(model1)
+```
+
+```{r}
+#sathvik Model_2
+bike_sharing_trn_transformed <- bike_sharing_trn
+
+# transformation
+bike_sharing_trn_transformed$log_temp <- log(bike_sharing_trn_transformed$temp)
+# Added small constant to hum to avoid taking the logarithm of zero
+bike_sharing_trn_transformed$log_hum <- log(bike_sharing_trn_transformed$hum)
+bike_sharing_trn_transformed$log_windspeed <- log(bike_sharing_trn_transformed$windspeed)
+
+names(bike_sharing_trn_transformed)
+
+# model
+model_2 <- lm(formula = cnt ~ log_temp + log(1 + hum) + log_windspeed + season_Summer + season_Fall + season_Winter + year_2012 + month_February + month_March + month_April + month_May + month_June + month_July + month_August + month_September + month_October + month_November + month_December + holiday_Yes + weekday_Monday + weekday_Tuesday + weekday_Wednesday + weekday_Thursday + weekday_Friday + weekday_Saturday + workingday_Yes + weathersit_Misty + `weathersit_Snow/Rain`, data = bike_sharing_trn_transformed)
+
+summary(model_2)
+
+#plot
+plot_diagnostics(model_2)
+
+
+```
+
+```{r}
+#Sathvik Model_3
+
+library(car)
+
+# Compute correlation matrix
+  correlation_matrix <- cor(bike_sharing_trn)
+
+# Identifying pairs of variables with high correlation coefficients
+highly_correlated_pairs <- which(correlation_matrix > 0.8 & correlation_matrix < 1, arr.ind = TRUE)
+print(highly_correlated_pairs)
+
+bike_sharing_trn_corr <- bike_sharing_trn
+bike_sharing_trn_corr <- subset(bike_sharing_trn_corr, select = -c(atemp)) # excluded "atemp"
+
+
+#model without atemp
+model_3 <- lm(cnt ~ . -workingday_Yes, data = bike_sharing_trn_corr)
+summary(model_3)
+
+#plot
+plot_diagnostics(model_3)
+
+
+vif_values_model_3 <- car::vif(model_3)
+vif_values_model_3
+
+
+#There are some variables with high VIP.
+#Trying transformation here too to see if it reduces the VIF
+
+
+
+```
+
+### MSE & $R^2$ Testing
+
+TBD
+
+```{r}
+library(knitr)
+
+## Discussion
+mod_list = list(model0, model1,model_2, model_3)
+rsme_table = data.frame(c("Base Model", "AIC model",  "Transformation", "CC"), sapply(mod_list, get_train_rmse), sapply(mod_list, get_test_rmse), sapply(mod_list, get_r_squared))
+
+#TBD
+kable(rsme_table, format = "markdown", col.names = c("Model", "Training RMSE", "Testing RMSE", "Adjusted R-Squared"))
+```
+
+## Discussion
+
+### Plot Diagnostics
