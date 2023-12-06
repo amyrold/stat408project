@@ -438,10 +438,46 @@ vif_values_model_3
 #Trying transformation here too to see if it reduces the VIF
 ```
 
-#### Model 4: KNN
+#### Model 4: KNN Cross-Validation
 
 ```{r}
-# TO DO plots for KNN
+# randomly shuffle the index
+index.random <- sample(1:dim(bike_sharing_trn)[1])
+
+# split the data (index) into 5 folds 
+groups <- cut(1:dim(bike_sharing_trn)[1], 5, labels = FALSE)
+index.fold <- split(index.random, groups)
+
+MSEs.k <- c()
+for(k in 1:20){
+  # an empty vector to save individual MSE
+  MSEs <- c()
+  
+  # 5-fold cross-validation
+  for(index.test in index.fold){
+    
+    # creat training and test set
+    data.test <- bike_sharing_trn[index.test,]
+    data.train <- bike_sharing_trn[-index.test,]
+    
+    # knn model
+    knnmodel <- knnreg(data.train, data.train$cnt, k = k)
+    
+    # predict on the test set
+    yhat.test = predict(knnmodel, data.test)
+    
+    
+    # calculate test MSE
+    y.test <- data.test$cnt
+    MSE.test <- mean((y.test - yhat.test)^2)
+    MSEs <- c(MSEs, MSE.test)
+  }
+  
+  # Average 5 MSEs
+  MSEs.k <- c(MSEs.k, mean(MSEs))
+}
+
+plot(MSEs.k, type='b', col='red', xlab='K', ylab='MSE',)
 ```
 
 ### NMSE Comparison
