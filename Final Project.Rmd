@@ -80,6 +80,7 @@ library(cowplot)
 library(carData)
 library(corrgram)
 library(faraway)
+library(caret)
 ```
 
 ```{r}
@@ -156,6 +157,12 @@ get_r_squared <- function(model) {
 # Get max vif
 get_max_vif <- function(model) {
   return(max(vif(model)))
+}
+
+# Get ANOVA score
+get_F_score <- function(m0, m1){
+  result <- anova(m0, m1)
+  return(result$F[2])
 }
 ```
 
@@ -366,20 +373,26 @@ summary(model3)
 
 #### Model 4: KNN
 ```{r}
-library(caret)
-# random split the data into 80% training and 20% test
-index.dev <- sample(1:dim(bike_sharing_trn)[1], 0.8 * dim(bike_sharing_trn)[1])
-dev.train <- bike_sharing_trn[index.train,]
-ddev.test <- bike_sharing_trn[-index.train,]
-
 # knn model
-knnmodel <- knnreg(data.train, data.train$cnt, k=5)
+model4 <- knnreg(bike_sharing_trn, bike_sharing_trn$cnt, k=5)
 
-# predict on the dev set
-yhat.test = predict(knnmodel, data.test)
+# Predict on the TRAIN set and calculate test scores
+yhat.train = predict(model4, bike_sharing_trn)
 
-# calculate dev Scores
-y.test <- data.test$cnt
+y.train <- bike_sharing_trn$cnt
+MSE.train <- mean((y.train - yhat.train)^2)
+MSE.train
+
+RMSE.train <- sqrt(MSE.train)
+RMSE.train
+
+NRMSE.train <- RMSE.train / mean(y.train)
+NRMSE.train
+
+# Predict on the TEST set and calculate test scores
+yhat.test = predict(model4, bike_sharing_tst)
+
+y.test <- bike_sharing_tst$cnt
 MSE.test <- mean((y.test - yhat.test)^2)
 MSE.test
 
@@ -388,8 +401,6 @@ RMSE.test
 
 NRMSE.test <- RMSE.test / mean(y.test)
 NRMSE.test
-
-
 ```
 
 
@@ -430,7 +441,7 @@ vif_values_model_3
 #### Model 4: KNN
 
 ```{r}
-plot_diagnostics(model4)
+# TO DO plots for KNN
 ```
 
 ### NMSE Comparison
@@ -443,17 +454,19 @@ trn_nrmse = c(
   get_nrmse(model0, bike_sharing_trn), 
   get_nrmse(model1, bike_sharing_trn),
   get_nrmse(model2, bike_sharing_trn_transformed),
-  get_nrmse(model3, bike_sharing_trn_corr)
+  get_nrmse(model3, bike_sharing_trn_corr),
+  NRMSE.train
 )
 tst_nrmse = c(
   get_nrmse(model0, bike_sharing_tst), 
   get_nrmse(model1, bike_sharing_tst),
   get_nrmse(model2, bike_sharing_tst_transformed),
-  get_nrmse(model3, bike_sharing_tst_corr)
+  get_nrmse(model3, bike_sharing_tst_corr),
+  NRMSE.test
 )
 
 nrsme_table = data.frame(
-  c("Base Model", "AIC Model", "Transformation Model", "Correlation Model"), trn_nrmse, tst_nrmse)
+  c("Base Model", "AIC Model", "Transformation Model", "Correlation Model", 'KNN Model'), trn_nrmse, tst_nrmse)
 
 kable(nrsme_table, format = "markdown", col.names = c("Model", "Training NRMSE", "Testing NRMSE"))
 ```
@@ -461,10 +474,19 @@ kable(nrsme_table, format = "markdown", col.names = c("Model", "Training NRMSE",
 ### R-Squared and VIF Test
 
 ```{r}
+# TODO Add ANOVA Scores
+F_scores <- c()
+for (i in mod_list) {
+  if (length(F_scores) == 0){
+    F_scores <- append(F_scores, NA)
+    next
+  }
+  F_scores <- append(F_scores, get_F_score(model0, i))
+}
 rvif_table = data.frame(
-  c("Base Model", "AIC Model", "Transformation Model", "Correlation Model"), sapply(mod_list, get_r_squared), sapply(mod_list, get_max_vif))
+  c("Base Model", "AIC Model", "Transformation Model", "Correlation Model"), sapply(mod_list, get_r_squared), sapply(mod_list, get_max_vif), F_scores)
 
-kable(rvif_table, format = "markdown", col.names = c("Model", "Adjusted R-Squared", "Max VIF"))
+kable(rvif_table, format = "markdown", col.names = c("Model", "Adjusted R-Squared", "Max VIF", 'F-score'))
 ```
 
 ## Discussion
