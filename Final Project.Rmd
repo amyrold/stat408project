@@ -413,16 +413,10 @@ vif_values_model_3
 #Trying transformation here too to see if it reduces the VIF
 ```
 
-#### Model 4: QQ-Norm
+#### Model 4: KNN
 
 ```{r}
 plot_diagnostics(model4)
-```
-
-#### Model 5: ANOVA
-
-```{r}
-plot_diagnostics(model5)
 ```
 
 ### MSE & $R^2$ Testing
