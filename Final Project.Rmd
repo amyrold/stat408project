@@ -111,15 +111,15 @@ Removed the `instant`, `registered`, `dteday` and `casual` columns from our data
 
 ```{r}
 # Plots "Fitted vs Residual" and "Q-Q" Plots 
-plot_diagnostics <- function(model) {
+plot_diagnostics <- function(m) {
   par(mfrow = c(1, 2))
-  plot(fitted(model), resid(model), 
+  plot(fitted(m), resid(m), 
        col = "grey", pch = 20, 
        xlab = "Fitted", ylab = "Residuals", 
        main = "Data from Additive Model")
   abline(h = 0, col = "darkorange", lwd = 2)
-  qqnorm(resid(model), main = "Normal Q-Q Plot", col = "darkgrey")
-  qqline(resid(model), col = "dodgerblue", lwd = 2)
+  qqnorm(resid(m), main = "Normal Q-Q Plot", col = "darkgrey")
+  qqline(resid(m), col = "dodgerblue", lwd = 2)
 }
 
 # Create bar plots for categorical vs numeric relationships
@@ -357,15 +357,32 @@ model3 <- lm(cnt ~ . -workingday_Yes, data = bike_sharing_trn_corr)
 summary(model3)
 ```
 
-
-#### Model 4: QQ-Norm
+#### Model 4: KNN
 ```{r}
+library(caret)
+# random split the data into 80% training and 20% test
+index.train <- sample(1:dim(bike_sharing_trn)[1], 0.8 * dim(bike_sharing_trn)[1])
+data.train <- bike_sharing_trn[index.train,]
+data.test <- bike_sharing_trn[-index.train,]
 
-```
+# knn model
+knnmodel <- knnreg(data.train, data.train$cnt, k=5)
 
-#### Model 5: ANOVA
-```{r}
+# predict on the test set
+yhat.test = predict(knnmodel, data.test)
 
+# calculate test MSE
+y.test <- data.test$cnt
+MSE.test <- mean((y.test - yhat.test)^2)
+MSE.test
+
+# root MSE
+RMSE.test <- sqrt(MSE.test)
+RMSE.test
+
+# normalized root MSE
+NRMSE.test <- RMSE.test / mean(y.test)
+NRMSE.test
 ```
 
 
