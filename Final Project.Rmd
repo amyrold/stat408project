@@ -81,6 +81,7 @@ library(carData)
 library(corrgram)
 library(faraway)
 library(caret)
+require(MASS)
 ```
 
 ```{r}
@@ -374,10 +375,11 @@ summary(model3)
 #### Model 4: KNN
 ```{r}
 # knn model
-model4 <- knnreg(bike_sharing_trn, bike_sharing_trn$cnt, k=5)
+factors <- colnames(bike_sharing_trn)[-c(2,5,10,16,19,20,28)]
+model4 <- knnreg(bike_sharing_trn[,factors], bike_sharing_trn$cnt, k=9)
 
 # Predict on the TRAIN set and calculate test scores
-yhat.train = predict(model4, bike_sharing_trn)
+yhat.train = predict(model4, bike_sharing_trn[,factors])
 
 y.train <- bike_sharing_trn$cnt
 MSE.train <- mean((y.train - yhat.train)^2)
@@ -390,7 +392,7 @@ NRMSE.train <- RMSE.train / mean(y.train)
 NRMSE.train
 
 # Predict on the TEST set and calculate test scores
-yhat.test = predict(model4, bike_sharing_tst)
+yhat.test = predict(model4, bike_sharing_tst[,factors])
 
 y.test <- bike_sharing_tst$cnt
 MSE.test <- mean((y.test - yhat.test)^2)
@@ -403,6 +405,49 @@ NRMSE.test <- RMSE.test / mean(y.test)
 NRMSE.test
 ```
 
+#### Model 5: Ridge Regression
+```{r}
+library(glmnet)
+# Assuming you have a dataframe 'data' with predictors and a response variable 'y'
+x <- as.matrix(bike_sharing_trn[, -5])  # predictor variables
+y <- bike_sharing_trn$cnt  # response variable
+
+# Scaling the predictor variables
+x <- scale(x)
+
+# Fit ridge regression model
+# Alpha = 0 indicates ridge regression
+ridge_model <- glmnet(x, y, alpha = 0)
+
+# To view the coefficients at different values of lambda
+print(coef(ridge_model))
+
+# Cross-validation to find optimal lambda
+cv_ridge <- cv.glmnet(x, y, alpha = 0)
+
+# Best lambda
+best_lambda <- cv_ridge$lambda.min
+print(best_lambda)
+
+# Fit model using the best lambda
+final_ridge_model <- glmnet(x, y, alpha = 0, lambda = best_lambda)
+
+# Assuming 'new_data' is your new dataset
+x.test <- as.matrix(bike_sharing_tst[, -5])  # New predictor variables
+x.test <- scale(x.test)  # Don't forget to scale the new predictor variables
+
+# Make predictions
+yhat.test <- predict(final_ridge_model, x.test)
+y.test <- bike_sharing_tst$cnt
+MSE.test <- mean((y.test - yhat.test)^2)
+MSE.test
+
+RMSE.test <- sqrt(MSE.test)
+RMSE.test
+
+NRMSE.test <- RMSE.test / mean(y.test)
+NRMSE.test
+```
 
 ## Results
 
@@ -461,10 +506,10 @@ for(k in 1:20){
     data.train <- bike_sharing_trn[-index.test,]
     
     # knn model
-    knnmodel <- knnreg(data.train, data.train$cnt, k = k)
+    knnmodel <- knnreg(data.train[,factors], data.train$cnt, k = k)
     
     # predict on the test set
-    yhat.test = predict(knnmodel, data.test)
+    yhat.test = predict(knnmodel, data.test[,factors])
     
     
     # calculate test MSE
