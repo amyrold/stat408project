@@ -432,21 +432,21 @@ print(best_lambda)
 # Fit model using the best lambda
 final_ridge_model <- glmnet(x, y, alpha = 0, lambda = best_lambda)
 
-# Assuming 'new_data' is your new dataset
+# Set test predictor
 x.test <- as.matrix(bike_sharing_tst[, -5])  # New predictor variables
 x.test <- scale(x.test)  # Don't forget to scale the new predictor variables
 
 # Make predictions
-yhat.test <- predict(final_ridge_model, x.test)
-y.test <- bike_sharing_tst$cnt
-MSE.test <- mean((y.test - yhat.test)^2)
-MSE.test
+yhat.ridge <- predict(final_ridge_model, x.test)
+y.ridge <- bike_sharing_tst$cnt
+MSE.ridge <- mean((y.ridge - yhat.ridge)^2)
+MSE.ridge
 
-RMSE.test <- sqrt(MSE.test)
-RMSE.test
+RMSE.ridge <- sqrt(MSE.ridge)
+RMSE.ridge
 
-NRMSE.test <- RMSE.test / mean(y.test)
-NRMSE.test
+NRMSE.ridge <- RMSE.ridge / mean(y.ridge)
+NRMSE.ridge
 ```
 
 ## Results
@@ -536,18 +536,20 @@ trn_nrmse = c(
   get_nrmse(model1, bike_sharing_trn),
   get_nrmse(model2, bike_sharing_trn_transformed),
   get_nrmse(model3, bike_sharing_trn_corr),
-  NRMSE.train
+  NRMSE.train,
+  NA
 )
 tst_nrmse = c(
   get_nrmse(model0, bike_sharing_tst), 
   get_nrmse(model1, bike_sharing_tst),
   get_nrmse(model2, bike_sharing_tst_transformed),
   get_nrmse(model3, bike_sharing_tst_corr),
-  NRMSE.test
+  NRMSE.test,
+  NRMSE.ridge
 )
 
 nrsme_table = data.frame(
-  c("Base Model", "AIC Model", "Transformation Model", "Correlation Model", 'KNN Model'), trn_nrmse, tst_nrmse)
+  c("Base Model", "AIC Model", "Transformation Model", "Correlation Model", 'KNN Model', 'Ridge Regression'), trn_nrmse, tst_nrmse)
 
 kable(nrsme_table, format = "markdown", col.names = c("Model", "Training NRMSE", "Testing NRMSE"))
 ```
