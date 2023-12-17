@@ -486,6 +486,60 @@ NRMSE.ridge <- RMSE.ridge / mean(y.ridge)
 NRMSE.ridge
 ```
 
+#### Model 6: Transformation + Ridge Regression
+```{r}
+bs_train_t <- bike_sharing_trn
+bs_test_t <- bike_sharing_tst
+
+# Transformation
+bs_train_t$cnt.t <- log(bs_train_t$cnt)
+bs_test_t$cnt.t <- log(bs_test_t$cnt)
+
+# Assuming you have a dataframe 'data' with predictors and a response variable 'y'
+x <- as.matrix(bs_train_t[, -c(2,5,10,16,19,20,28,31)])  # predictor variables
+y <- bs_train_t$cnt.t  # response variable
+
+# Scaling the predictor variables
+x <- scale(x)
+
+# Fit ridge regression model
+# Alpha = 0 indicates ridge regression
+ridge_model <- glmnet(x, y, alpha = 0)
+
+# Plotting coefficient paths
+plot(ridge_model, xvar = "lambda", label = TRUE)
+
+# To view the coefficients at different values of lambda
+print(coef(ridge_model))
+
+# Cross-validation to find optimal lambda
+cv_ridge <- cv.glmnet(x, y, alpha = 0)
+
+# Best lambda
+best_lambda <- cv_ridge$lambda.min
+print(best_lambda)
+
+# Fit model using the best lambda
+final_ridge_model <- glmnet(x, y, alpha = 0, lambda = best_lambda)
+
+# Set test predictor
+x.test <- as.matrix(bs_test_t[, -c(2,5,10,16,19,20,28,31)])  # New predictor variables
+x.test <- scale(x.test)  # Don't forget to scale the new predictor variables
+
+# Make predictions
+yhat.trr <- predict(final_ridge_model, x.test)
+y.trr <- bs_test_t$cnt.t
+MSE.trr <- mean((y.trr - yhat.trr)^2)
+MSE.trr
+
+RMSE.trr <- sqrt(MSE.trr)
+RMSE.trr
+
+NRMSE.trr <- RMSE.trr / mean(y.trr)
+NRMSE.trr
+
+```
+
 ## Results
 
 ### Plot Diagnostics
@@ -574,6 +628,7 @@ trn_nrmse = c(
   get_nrmse(model2, bike_sharing_trn_transformed),
   get_nrmse(model3, bike_sharing_trn_corr),
   NRMSE.train,
+  NA,
   NA
 )
 tst_nrmse = c(
@@ -582,11 +637,12 @@ tst_nrmse = c(
   get_nrmse(model2, bike_sharing_tst_transformed),
   get_nrmse(model3, bike_sharing_tst_corr),
   NRMSE.test,
-  NRMSE.ridge
+  NRMSE.ridge,
+  NRMSE.trr
 )
 
 nrsme_table = data.frame(
-  c("Base Model", "AIC Model", "Transformation Model", "Correlation Model", 'KNN Model', 'Ridge Regression'), trn_nrmse, tst_nrmse)
+  c("Base Model", "AIC Model", "Transformation Model", "Correlation Model", 'KNN Model', 'Ridge Regression', 'Transform + RR'), trn_nrmse, tst_nrmse)
 
 kable(nrsme_table, format = "markdown", col.names = c("Model", "Training NRMSE", "Testing NRMSE"))
 ```
