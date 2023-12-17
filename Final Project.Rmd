@@ -82,7 +82,6 @@ library(corrgram)
 library(faraway)
 library(caret)
 require(MASS)
-library(reshape2)
 ```
 
 ```{r}
@@ -166,12 +165,6 @@ get_F_score <- function(m0, m1){
   result <- anova(m0, m1)
   return(result$F[2])
 }
-
-get_p_value <- function(m0, m1){
-  result <- anova(model0, m1)
-  return(result$`Pr(>F)`[2])
-}
-
 ```
 
 ### Investigation and Variable Relationships
@@ -339,24 +332,25 @@ summary(model1)
 ```{r}
 #sathvik Model_2
 bike_sharing_trn_transformed <- bike_sharing_trn
+bike_sharing_tst_transformed <- bike_sharing_tst
  
 # Transformation
 bike_sharing_trn_transformed$log_temp <- log(bike_sharing_trn_transformed$temp)
-# Added small constant to hum to avoid taking the logarithm of zero
 bike_sharing_trn_transformed$log_hum <- log(bike_sharing_trn_transformed$hum)
 bike_sharing_trn_transformed$log_windspeed <- log(bike_sharing_trn_transformed$windspeed)
+bike_sharing_trn_transformed$log_cnt <- log(bike_sharing_trn_transformed$cnt + 1) 
 
-# Doing the same for the test set
-bike_sharing_tst_transformed <- bike_sharing_tst
+# Doing same for the test set
 bike_sharing_tst_transformed$log_temp <- log(bike_sharing_tst_transformed$temp)
 bike_sharing_tst_transformed$log_hum <- log(bike_sharing_tst_transformed$hum)
 bike_sharing_tst_transformed$log_windspeed <- log(bike_sharing_tst_transformed$windspeed)
 
-names(bike_sharing_trn_transformed)
-```
 
-```{r}
-model2 <- lm(formula = cnt ~ log_temp + log(1 + hum) + log_windspeed + season_Summer + season_Fall + season_Winter + year_2012 + month_February + month_March + month_April + month_May + month_June + month_July + month_August + month_September + month_October + month_November + month_December + holiday_Yes + weekday_Monday + weekday_Tuesday + weekday_Wednesday + weekday_Thursday + weekday_Friday + weekday_Saturday + weathersit_Misty + `weathersit_Snow/Rain`, data = bike_sharing_trn_transformed)
+# Transformation for the response variable (cnt)
+bike_sharing_tst_transformed$log_cnt <- log(bike_sharing_tst_transformed$cnt + 1)
+
+#model with the transformed response variable
+model2 <- lm(formula = log_cnt ~ log_temp + log(1 + hum) + log_windspeed + season_Summer + season_Fall + season_Winter + year_2012 + month_February + month_March + month_April + month_May + month_June + month_July + month_August + month_September + month_October + month_November + month_December + holiday_Yes + weekday_Monday + weekday_Tuesday + weekday_Wednesday + weekday_Thursday + weekday_Friday + weekday_Saturday + weathersit_Misty + `weathersit_Snow/Rain`, data = bike_sharing_trn_transformed)
 summary(model2)
 ```
 
@@ -377,33 +371,7 @@ bike_sharing_tst_corr <- subset(bike_sharing_tst_corr, select = -c(atemp))
  
 #model without atemp
 model3 <- lm(cnt ~ . -workingday_Yes, data = bike_sharing_trn_corr)
-#summary(model3)
-
-# creating correlation matrix
- 
-# reduce the size of correlation matrix
-melted_corr_mat <- melt(correlation_matrix)
-ggplot(
-  data = melted_corr_mat, 
-  aes(x=Var1, y=Var2, fill=value)) + 
-  scale_fill_gradient(
-    name = "Cor", # changes legend title
-    low = "orange",
-    high = "blue",
-    limit = c(-1, 1),
-    space = "Lab",
-    guide = "colourbar"
-  ) + geom_tile() + 
-  theme(
-    axis.title.x = element_blank(),
-    axis.title.y = element_blank(),
-    axis.text.x = element_text(
-      angle = 90,
-      vjust = 1,
-      size = 12,
-      hjust = 1
-    )
-  )
+summary(model3)
 ```
 
 #### Model 4: KNN
@@ -452,9 +420,6 @@ x <- scale(x)
 # Fit ridge regression model
 # Alpha = 0 indicates ridge regression
 ridge_model <- glmnet(x, y, alpha = 0)
-
-# Plotting coefficient paths
-plot(ridge_model, xvar = "lambda", label = TRUE)
 
 # To view the coefficients at different values of lambda
 print(coef(ridge_model))
@@ -652,33 +617,35 @@ kable(nrsme_table, format = "markdown", col.names = c("Model", "Training NRMSE",
 ```{r}
 # TODO Add ANOVA Scores
 F_scores <- c()
-p_values <- c()
 for (i in mod_list) {
+  if (length(F_scores) == 0){
+    F_scores <- append(F_scores, NA)
+    next
+  }
   F_scores <- append(F_scores, get_F_score(model0, i))
-  p_values <- append(p_values, get_p_value(model0, i))
 }
 rvif_table = data.frame(
-  c("Base Model", "AIC Model", "Transformation Model", "Correlation Model"), sapply(mod_list, get_r_squared), sapply(mod_list, get_max_vif), F_scores, p_values)
+  c("Base Model", "AIC Model", "Transformation Model", "Correlation Model"), sapply(mod_list, get_r_squared), sapply(mod_list, get_max_vif), F_scores)
 
-kable(rvif_table, format = "markdown", col.names = c("Model", "Adjusted R-Squared", "Max VIF", 'F-Ratio', 'P-value'))
+kable(rvif_table, format = "markdown", col.names = c("Model", "Adjusted R-Squared", "Max VIF", 'F-score'))
 ```
 
 ## Discussion
 
 ### Plot Diagnostics
 
-Although this study intended to fit a good predictive model, the group members decided that all models must hold for all LINE assumptions, for them to be considered. Looking at the plot diagnostics, we notice that both the Q-Q Plots and the Fitted vs. Residual Plots were similar in all 4 regression. The Fitted vs. Residuals plots indicated constant variance, however the Q-Q plots had a heavy tail skew which can indicate that there is less data at the center of the distribution. In our KNN model we see that we 3-4 we get an optimal MSE, however after k=9 we start seeing an increase in MSE again.
+Although this study intended to fit a good predictive model, the group members decided that all models must hold for all LINE assumptions, for them to be considered. Looking at the plot diagnostics, we notice the following:
+
+`Model 1`'s Q-Q Plot had an evident tail on the left hand side, which resulted in a violation of the normality assumption. There is not much difference between this plot and the base model's plot
 
 ### NRMSE Comparison
 
-Looking at the testing NRMSE, we see that the transformation model has the lowest score (with what we want). However all 4 linear regression models are close to one another. The Ridge Regression model has a slightly higher score than the regression models, and the KNN model has the highest.
+TBD
 
-### R-Squared, VIF and ANOVA Test
+### R-Squared and VIF Test
 
-The transformation model has the highest adjusted R-Squared and a reasonable VIF score (indicating there is no strong collinearity in our model). The base model has both the lowest adjust r-squared and a high VIF value indicating there is some level on collinearity in the model. 
-
-We performed ANOVA tests to view any significance between our base model and our other regression models we noticed that for the correlation model and AIC model that neither are significant at the p < .05 level. Our transformation model does not appear to have a p-value associated with it since it is not a nested model (the transformation model has some variables not found in the base model).
+TBD
 
 ## Conclusion
 
-After looking at all the factors, our linear regression model using transformation appears to be the model that could be best used to predict the number of bikes we may need on a given day based on the environmental and calendar factors.
+TBD
