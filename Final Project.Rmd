@@ -471,11 +471,21 @@ bs_train_t <- bike_sharing_trn
 bs_test_t <- bike_sharing_tst
 
 # Transformation
-bs_train_t$cnt.t <- log(bs_train_t$cnt)
-bs_test_t$cnt.t <- log(bs_test_t$cnt)
+bs_train_t$cnt.t <- log(bs_train_t$cnt + 1)
+bs_test_t$cnt.t <- log(bs_test_t$cnt + 1)
+
+# Transformation
+bs_train_t$log_temp <- log(bs_train_t$temp)
+bs_train_t$log_hum <- log(bs_train_t$hum+1)
+bs_train_t$log_windspeed <- log(bs_train_t$windspeed)
+
+# Doing same for the test set
+bs_test_t$log_temp <- log(bs_test_t$temp)
+bs_test_t$log_hum <- log(bs_test_t$hum+1)
+bs_test_t$log_windspeed <- log(bs_test_t$windspeed)
 
 # Assuming you have a dataframe 'data' with predictors and a response variable 'y'
-x <- as.matrix(bs_train_t[, -c(2,5,10,16,19,20,28,31)])  # predictor variables
+x <- as.matrix(bs_train_t[, -c(1,2,3,4,5,10,16,19,20,28,31)])  # predictor variables
 y <- bs_train_t$cnt.t  # response variable
 
 # Scaling the predictor variables
@@ -502,7 +512,7 @@ print(best_lambda)
 final_ridge_model <- glmnet(x, y, alpha = 0, lambda = best_lambda)
 
 # Set test predictor
-x.test <- as.matrix(bs_test_t[, -c(2,5,10,16,19,20,28,31)])  # New predictor variables
+x.test <- as.matrix(bs_test_t[, -c(1,2,3,4,5,10,16,19,20,28,31)])  # New predictor variables
 x.test <- scale(x.test)  # Don't forget to scale the new predictor variables
 
 # Make predictions
